@@ -5,7 +5,7 @@ from sqlalchemy import select, and_
 from typing import List, Optional, Dict, Any
 import asyncio
 from datetime import datetime
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
 from database import get_db
 from models import *
@@ -661,10 +661,13 @@ async def generate_needs_analysis_pdf(
     if not needs_analysis:
         raise HTTPException(status_code=404, detail="Needs analysis not found")
     
-    # Get recommendations
-    from models import Recommendation as RecommendationModel
+    # Get recommendations (eager load product and insurer)
+    from sqlalchemy.orm import selectinload
+    from models import Recommendation as RecommendationModel, Product as ProductModel
     rec_query = select(RecommendationModel).where(
         RecommendationModel.customer_id == customer_id
+    ).options(
+        selectinload(RecommendationModel.product).selectinload(ProductModel.insurer)
     ).order_by(RecommendationModel.priority.desc())
     rec_result = await db.execute(rec_query)
     recommendations = rec_result.scalars().all()
@@ -788,10 +791,13 @@ async def generate_comprehensive_report_pdf(
     needs_result = await db.execute(needs_query)
     needs_analysis = needs_result.scalar_one_or_none()
     
-    # Get recommendations
-    from models import Recommendation as RecommendationModel
+    # Get recommendations (eager load product and insurer)
+    from sqlalchemy.orm import selectinload
+    from models import Recommendation as RecommendationModel, Product as ProductModel
     rec_query = select(RecommendationModel).where(
         RecommendationModel.customer_id == customer_id
+    ).options(
+        selectinload(RecommendationModel.product).selectinload(ProductModel.insurer)
     ).order_by(RecommendationModel.priority.desc())
     rec_result = await db.execute(rec_query)
     recommendations = rec_result.scalars().all()
