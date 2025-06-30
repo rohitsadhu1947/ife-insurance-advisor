@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { apiService } from '../services/api';
 
 interface RecommendationsProps {
@@ -40,7 +40,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({ customerId, onBack })
       try {
         setLoading(true);
         const data = await apiService.getRecommendations(customerId);
-        setRecommendations(data);
+        setRecommendations(data as Recommendation[]);
       } catch (err) {
         setError('Failed to fetch recommendations');
         console.error('Error fetching recommendations:', err);
@@ -57,6 +57,21 @@ const Recommendations: React.FC<RecommendationsProps> = ({ customerId, onBack })
       currency: 'INR',
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  // Add this function to handle sharing
+  const handleShare = (rec: Recommendation) => {
+    const shareText = `Check out this insurance recommendation: ${rec.product.name} by ${rec.product.insurer.name}. Sum Assured: ${formatCurrency(rec.sum_assured)}, Premium: ${formatCurrency(rec.premium_amount)}. See more at: https://ife-insurance-advisor.com/`;
+    const shareUrl = 'https://ife-insurance-advisor.com/'; // Replace with actual URL if available
+    if (navigator.share) {
+      navigator.share({
+        title: 'Insurance Recommendation',
+        text: shareText,
+        url: shareUrl,
+      });
+    } else {
+      // fallback handled by dropdown
+    }
   };
 
   if (loading) {
@@ -163,6 +178,50 @@ const Recommendations: React.FC<RecommendationsProps> = ({ customerId, onBack })
               <button className="btn-primary">View Details</button>
               <button className="btn-secondary">Compare</button>
               <button className="btn-secondary">Calculate Premium</button>
+              {/* Share Button */}
+              <div className="relative group">
+                <button
+                  className="btn-secondary"
+                  onClick={() => handleShare(rec)}
+                  type="button"
+                >
+                  Share
+                </button>
+                {/* Dropdown for fallback if Web Share API is not available */}
+                {!navigator.share && (
+                  <div className="absolute z-10 left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg p-2 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+                    <a
+                      href={`https://wa.me/?text=${encodeURIComponent(`Check out this insurance recommendation: ${rec.product.name} by ${rec.product.insurer.name}. Sum Assured: ${formatCurrency(rec.sum_assured)}, Premium: ${formatCurrency(rec.premium_amount)}. See more at: https://ife-insurance-advisor.com/`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block px-4 py-2 text-green-600 hover:bg-green-50 rounded"
+                    >
+                      WhatsApp
+                    </a>
+                    <a
+                      href={`mailto:?subject=Insurance Recommendation&body=${encodeURIComponent(`Check out this insurance recommendation: ${rec.product.name} by ${rec.product.insurer.name}. Sum Assured: ${formatCurrency(rec.sum_assured)}, Premium: ${formatCurrency(rec.premium_amount)}. See more at: https://ife-insurance-advisor.com/`)}`}
+                      className="block px-4 py-2 text-blue-600 hover:bg-blue-50 rounded"
+                    >
+                      Email
+                    </a>
+                    <a
+                      href={`sms:?body=${encodeURIComponent(`Check out this insurance recommendation: ${rec.product.name} by ${rec.product.insurer.name}. Sum Assured: ${formatCurrency(rec.sum_assured)}, Premium: ${formatCurrency(rec.premium_amount)}. See more at: https://ife-insurance-advisor.com/`)}`}
+                      className="block px-4 py-2 text-indigo-600 hover:bg-indigo-50 rounded"
+                    >
+                      SMS
+                    </a>
+                    <button
+                      className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-100 rounded"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`Check out this insurance recommendation: ${rec.product.name} by ${rec.product.insurer.name}. Sum Assured: ${formatCurrency(rec.sum_assured)}, Premium: ${formatCurrency(rec.premium_amount)}. See more at: https://ife-insurance-advisor.com/`);
+                        alert('Link copied to clipboard!');
+                      }}
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ))}

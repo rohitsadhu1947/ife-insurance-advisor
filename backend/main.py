@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Any
 import asyncio
 from datetime import datetime
 from sqlalchemy.orm import joinedload, selectinload
+import os
+from fastapi.responses import JSONResponse
 
 from database import get_db
 from models import *
@@ -379,6 +381,86 @@ async def get_needs_analysis(customer_id: int, db: AsyncSession = Depends(get_db
     
     return needs_analysis
 
+@app.get("/needs-analysis/enhanced/")
+async def get_enhanced_needs_analysis(
+    customer_id: int = Query(..., description="Customer ID"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get enhanced needs analysis with customer details, breakdown, and recommendations"""
+    from models import Customer as CustomerModel, NeedsAnalysis as NeedsAnalysisModel
+    from sqlalchemy.orm import selectinload
+    
+    # Get customer with needs analysis
+    customer_query = select(CustomerModel).where(CustomerModel.id == customer_id)
+    customer_result = await db.execute(customer_query)
+    customer = customer_result.scalar_one_or_none()
+    
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    # Get most recent needs analysis
+    needs_query = select(NeedsAnalysisModel).where(
+        NeedsAnalysisModel.customer_id == customer_id
+    ).order_by(NeedsAnalysisModel.analysis_date.desc())
+    needs_result = await db.execute(needs_query)
+    needs_analysis = needs_result.scalar_one_or_none()
+    
+    if not needs_analysis:
+        raise HTTPException(status_code=404, detail="Needs analysis not found")
+    
+    # Calculate breakdown
+    breakdown = {
+        "income_replacement": needs_analysis.income_replacement_needs,
+        "family_expenses": needs_analysis.human_life_value * 0.3,  # 30% for family expenses
+        "emergency_fund": customer.annual_income * 0.1  # 10% of annual income
+    }
+    
+    # Calculate premium estimates
+    premium_estimates = {
+        "term_life": needs_analysis.total_insurance_needs * 0.001,  # 0.1% of sum assured
+        "endowment": needs_analysis.total_insurance_needs * 0.008,  # 0.8% of sum assured
+        "ulip": needs_analysis.total_insurance_needs * 0.012  # 1.2% of sum assured
+    }
+    
+    # Generate recommendations
+    recommendations = {
+        "primary_recommendation": "Term Life Insurance" if customer.age < 40 else "Endowment Plan",
+        "reasoning": f"Based on your age ({customer.age}), income (₹{customer.annual_income:,}), and family size ({customer.family_size}), we recommend a comprehensive insurance portfolio.",
+        "next_steps": [
+            "Review the recommended coverage amount",
+            "Compare different insurance products",
+            "Consult with our advisors for personalized recommendations",
+            "Consider additional riders for enhanced protection"
+        ]
+    }
+    
+    # Market insights
+    market_insights = {
+        "inflation_impact": f"With current inflation rate of 6%, your ₹{needs_analysis.total_insurance_needs:,} coverage will be worth ₹{int(needs_analysis.total_insurance_needs * 0.94):,} in real terms after 10 years.",
+        "tax_benefits": "Life insurance premiums up to ₹1.5 lakhs are eligible for tax deduction under Section 80C.",
+        "claim_settlement": "Top insurers have claim settlement ratios above 95%, ensuring your family receives the benefits when needed."
+    }
+    
+    return {
+        "customer": {
+            "name": customer.name,
+            "age": customer.age,
+            "annual_income": customer.annual_income,
+            "family_size": customer.family_size,
+            "dependents": customer.dependents,
+            "risk_appetite": customer.risk_appetite
+        },
+        "needs_analysis": {
+            "human_life_value": needs_analysis.human_life_value,
+            "recommended_coverage": needs_analysis.total_insurance_needs,
+            "additional_coverage_needed": needs_analysis.additional_coverage_needed,
+            "breakdown": breakdown
+        },
+        "premium_estimates": premium_estimates,
+        "recommendations": recommendations,
+        "market_insights": market_insights
+    }
+
 # Recommendation endpoints
 @app.post("/recommendations/generate/", response_model=List[Recommendation])
 async def generate_recommendations(
@@ -637,33 +719,31 @@ async def generate_needs_analysis_pdf(
     customer_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Generate PDF report for needs analysis"""
-    from fastapi.responses import StreamingResponse
+    """Generate PDF report for needs analysis and return a public URL"""
     from pdf_service import PDFReportService
-    
-    # Get customer details
     from models import Customer as CustomerModel
+    from models import NeedsAnalysis as NeedsAnalysisModel
+    from sqlalchemy.orm import selectinload
+    from models import Recommendation as RecommendationModel, Product as ProductModel
+    import uuid
+
+    # Get customer details
     customer_query = select(CustomerModel).where(CustomerModel.id == customer_id)
     customer_result = await db.execute(customer_query)
     customer = customer_result.scalar_one_or_none()
-    
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    
+
     # Get needs analysis
-    from models import NeedsAnalysis as NeedsAnalysisModel
     needs_query = select(NeedsAnalysisModel).where(
         NeedsAnalysisModel.customer_id == customer_id
     ).order_by(NeedsAnalysisModel.analysis_date.desc())
     needs_result = await db.execute(needs_query)
     needs_analysis = needs_result.scalar_one_or_none()
-    
     if not needs_analysis:
         raise HTTPException(status_code=404, detail="Needs analysis not found")
-    
+
     # Get recommendations (eager load product and insurer)
-    from sqlalchemy.orm import selectinload
-    from models import Recommendation as RecommendationModel, Product as ProductModel
     rec_query = select(RecommendationModel).where(
         RecommendationModel.customer_id == customer_id
     ).options(
@@ -671,7 +751,7 @@ async def generate_needs_analysis_pdf(
     ).order_by(RecommendationModel.priority.desc())
     rec_result = await db.execute(rec_query)
     recommendations = rec_result.scalars().all()
-    
+
     # Prepare data for PDF
     pdf_data = {
         "customer_info": {
@@ -689,8 +769,6 @@ async def generate_needs_analysis_pdf(
         },
         "recommendations": []
     }
-    
-    # Add recommendations if available
     for rec in recommendations:
         pdf_data["recommendations"].append({
             "product_name": rec.product.name if rec.product else "N/A",
@@ -699,18 +777,21 @@ async def generate_needs_analysis_pdf(
             "premium": rec.premium_amount,
             "priority": rec.priority
         })
-    
+
     # Generate PDF
     pdf_buffer = PDFReportService.create_needs_analysis_report(pdf_data)
-    
-    # Return PDF as streaming response
-    return StreamingResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=needs_analysis_{customer.name.replace(' ', '_')}.pdf"
-        }
-    )
+
+    # Save PDF to static directory
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    os.makedirs(static_dir, exist_ok=True)
+    safe_name = customer.name.replace(" ", "_")
+    filename = f"needs_analysis_{safe_name}_{uuid.uuid4().hex[:8]}.pdf"
+    file_path = os.path.join(static_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(pdf_buffer.read())
+    # Construct public URL (assuming /static/ is served at /static/)
+    public_url = f"/static/{filename}"
+    return JSONResponse({"pdf_url": public_url})
 
 @app.post("/pdf/product-comparison/")
 async def generate_product_comparison_pdf(

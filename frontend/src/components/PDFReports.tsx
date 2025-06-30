@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ShareButton from './ShareButton';
 
 interface Customer {
   id: number;
@@ -29,7 +30,7 @@ const PDFReports: React.FC<PDFReportsProps> = ({ apiBaseUrl }) => {
     try {
       setLoading(true);
       const response = await axios.get(`${apiBaseUrl}/customers/`);
-      setCustomers(response.data);
+      setCustomers(response.data as Customer[]);
     } catch (err) {
       setError('Failed to fetch customers');
     } finally {
@@ -131,13 +132,22 @@ const PDFReports: React.FC<PDFReportsProps> = ({ apiBaseUrl }) => {
                 <p className="text-sm text-gray-600 mb-4">
                   Comprehensive insurance needs assessment with recommendations.
                 </p>
-                <button
-                  onClick={() => generatePDF('needs-analysis')}
-                  disabled={loading}
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loading ? 'Generating...' : 'Generate PDF'}
-                </button>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => generatePDF('needs-analysis')}
+                    disabled={loading}
+                    className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Generating...' : 'Generate PDF'}
+                  </button>
+                  <ShareButton
+                    shareText={`Check out this Needs Analysis Report for ${customers.find(c => c.id === selectedCustomer)?.name || 'Customer'} (Age: ${customers.find(c => c.id === selectedCustomer)?.age}, Income: ₹${customers.find(c => c.id === selectedCustomer)?.annual_income}). Download your personalized report at:`}
+                    shareUrl={window.location.href}
+                    customerName={customers.find(c => c.id === selectedCustomer)?.name}
+                    customerEmail={customers.find(c => c.id === selectedCustomer)?.email}
+                    buttonLabel="Share"
+                  />
+                </div>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -147,13 +157,22 @@ const PDFReports: React.FC<PDFReportsProps> = ({ apiBaseUrl }) => {
                 <p className="text-sm text-gray-600 mb-4">
                   Complete insurance portfolio analysis with market insights.
                 </p>
-                <button
-                  onClick={() => generatePDF('comprehensive')}
-                  disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  {loading ? 'Generating...' : 'Generate PDF'}
-                </button>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => generatePDF('comprehensive')}
+                    disabled={loading}
+                    className="bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {loading ? 'Generating...' : 'Generate PDF'}
+                  </button>
+                  <ShareButton
+                    shareText={`Comprehensive Insurance Report for ${customers.find(c => c.id === selectedCustomer)?.name || 'Customer'} (Age: ${customers.find(c => c.id === selectedCustomer)?.age}, Income: ₹${customers.find(c => c.id === selectedCustomer)?.annual_income}). Download your personalized report at:`}
+                    shareUrl={window.location.href}
+                    customerName={customers.find(c => c.id === selectedCustomer)?.name}
+                    customerEmail={customers.find(c => c.id === selectedCustomer)?.email}
+                    buttonLabel="Share"
+                  />
+                </div>
               </div>
             </div>
           </div>

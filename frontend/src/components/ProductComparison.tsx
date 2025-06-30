@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ShareButton from './ShareButton';
 
 interface Product {
   id: number;
@@ -269,8 +270,8 @@ const ProductComparison: React.FC = () => {
 
       {/* Comparison Results */}
       {comparisonResult && (
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-2xl font-bold text-gray-800 mb-6">Comparison Results</h3>
+        <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-4">Comparison Results</h3>
           
           {/* Summary */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -403,6 +404,16 @@ const ProductComparison: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-6 flex flex-col md:flex-row md:items-center gap-4">
+            <ShareButton
+              shareText={`Insurance Product Comparison for ${customerProfile.age} y/o ${customerProfile.gender}, Income: ₹${customerProfile.annual_income}. Compared: ${comparisonResult.comparison_data.map(p => p.product_name).join(', ')}. Best Value: ${comparisonResult.summary.best_value_product}. See more at:`}
+              shareUrl={window.location.href}
+              customerName={undefined}
+              customerEmail={undefined}
+              buttonLabel="Share Comparison"
+            />
           </div>
         </div>
       )}
