@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, case
 from typing import List, Optional, Dict, Any
 import asyncio
 from datetime import datetime
@@ -1086,7 +1086,7 @@ async def get_analytics_dashboard(
     # Get customer demographics
     # Age groups
     age_groups_query = select(
-        func.case(
+        case(
             (Customer.age < 25, "18-24"),
             (Customer.age < 35, "25-34"),
             (Customer.age < 45, "35-44"),
@@ -1108,7 +1108,7 @@ async def get_analytics_dashboard(
     
     # Income ranges
     income_ranges_query = select(
-        func.case(
+        case(
             (Customer.annual_income < 500000, "₹0-5L"),
             (Customer.annual_income < 1000000, "₹5-10L"),
             (Customer.annual_income < 2000000, "₹10-20L"),
@@ -1246,7 +1246,7 @@ async def get_customer_insights(db: AsyncSession = Depends(get_db)):
     
     # Average sum assured by age group
     avg_sum_assured_query = select(
-        func.case(
+        case(
             (Customer.age < 25, "18-24"),
             (Customer.age < 35, "25-34"),
             (Customer.age < 45, "35-44"),
