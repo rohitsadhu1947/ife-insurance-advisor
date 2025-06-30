@@ -1136,7 +1136,7 @@ async def get_analytics_dashboard(
     
     pdf_reports_query = select(func.count(Report.id))
     if period != "all":
-        pdf_reports_query = pdf_reports_query.where(Report.created_at >= start_date)
+        pdf_reports_query = pdf_reports_query.where(Report.generated_at >= start_date)
     pdf_reports_result = await db.execute(pdf_reports_query)
     pdf_reports_created = pdf_reports_result.scalar() or 0
     
